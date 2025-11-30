@@ -57,19 +57,21 @@ int main()
         return crow::response(201, response_data.dump());
     });
 
-    // get method to search with to params source and destination 
-    CROW_ROUTE(app,"/api/search/").methods(crow::HTTPMethod::GET)
+    // get method to search with two params source and destination 
+    CROW_ROUTE(app,"/api/search").methods(crow::HTTPMethod::GET)
     ([](const crow::request& req){
-        auto query_params = crow::query_string(req.url_params);
-        char* source = query_params.get("source");
-        char* destination = query_params.get("destination");
+        string source = req.url_params.get("source");
+        string destination = req.url_params.get("destination");
 
-        if (!source || !destination) {
-            return crow::response(400, "Missing 'source' or 'destination' parameter");
+        if (source.empty() || destination.empty()) {
+            json error;
+            error["status"] = "error";
+            error["message"] = "Missing 'source' or 'destination' parameter";
+            return crow::response(400, error.dump());
         }
 
         // Call parth function and get 3 paths
-        json result_paths = parth(string(source), string(destination));
+        json result_paths = parth(source, destination);
 
         // Prepare response
         json response;

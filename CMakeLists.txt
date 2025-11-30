@@ -1,7 +1,14 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.20)
 project(MyCppBackend)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
+
+# ==========================================
+# PATCH: Set policy for old CMake versions in dependencies
+# ==========================================
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
 # ==========================================
 # 1. SETUP: Prevent Errors & Define Variables
@@ -22,8 +29,7 @@ include(FetchContent)
 # ==========================================
 FetchContent_Declare(
   asio
-  GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
-  GIT_TAG asio-1-30-2  # Stable version
+  URL https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-30-2.zip
 )
 FetchContent_MakeAvailable(asio)
 
@@ -35,8 +41,7 @@ set(ASIO_INCLUDE_DIR ${asio_SOURCE_DIR}/asio/include CACHE PATH "Path to Asio" F
 # ==========================================
 FetchContent_Declare(
   Crow
-  GIT_REPOSITORY https://github.com/CrowCpp/Crow.git
-  GIT_TAG master
+  URL https://github.com/CrowCpp/Crow/archive/refs/heads/master.zip
 )
 FetchContent_MakeAvailable(Crow)
 
@@ -45,8 +50,7 @@ FetchContent_MakeAvailable(Crow)
 # ==========================================
 FetchContent_Declare(
     json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.2
+    URL https://github.com/nlohmann/json/archive/refs/tags/v3.11.2.zip
 )
 FetchContent_MakeAvailable(json)
 
