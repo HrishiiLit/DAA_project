@@ -27,7 +27,9 @@ int main()
         json response;
         response["status"] = "running";
         response["port"] = 18080;
-        return crow::response(response.dump());
+        auto res = crow::response(response.dump());
+        res.set_header("Content-Type", "application/json");
+        return res;
     });
 
     // ==========================================
@@ -54,7 +56,9 @@ int main()
         response_data["message"] = "User " + name + " created!";
         response_data["id"] = 101; 
 
-        return crow::response(201, response_data.dump());
+        auto res = crow::response(201, response_data.dump());
+        res.set_header("Content-Type", "application/json");
+        return res;
     });
 
     // get method to search with two params source and destination 
@@ -67,7 +71,9 @@ int main()
             json error;
             error["status"] = "error";
             error["message"] = "Missing 'source' or 'destination' parameter";
-            return crow::response(400, error.dump());
+            auto res = crow::response(400, error.dump());
+            res.set_header("Content-Type", "application/json");
+            return res;
         }
 
         // Call parth function and get 3 paths
@@ -81,7 +87,9 @@ int main()
         response["paths_found"] = result_paths.size();
         response["paths"] = result_paths;
 
-        return crow::response(200, response.dump());
+        auto res = crow::response(200, response.dump());
+        res.set_header("Content-Type", "application/json");
+        return res;
     });
 
     // ==========================================
