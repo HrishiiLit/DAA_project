@@ -1,6 +1,10 @@
-#include "crow.h"
+#include <crow.h>
+#include <nlohmann/json.hpp>
 #include "jsondb.h"
+#include "Models.h"
 #include <iostream>
+
+using json = nlohmann::json;
 
 // ==========================================
 // 1. DEFINE CORS MIDDLEWARE
@@ -29,15 +33,15 @@ int main() {
     crow::App<CORSHandler> app;
 
     // ==========================================
-    // GLOBAL OPTIONS ROUTE (Handle Preflight Requests)
-    // Browsers send an "OPTIONS" request first to check security.
-    // We must catch this and return 200 OK.
+    // CORS is handled via CORSHandler middleware - no need for explicit OPTIONS routes
     // ==========================================
-    CROW_ROUTE(app, "/<path>")
-    .methods(crow::HTTPMethod::OPTIONS)
-    ([](const crow::request& req, crow::response& res){
-        res.code = 200;
-        res.end();
+
+    // ==========================================
+    // HEALTH CHECK ENDPOINT
+    // ==========================================
+    CROW_ROUTE(app, "/health")
+    ([](){
+        return crow::response(200, "OK");
     });
 
     // ==========================================
