@@ -1,111 +1,64 @@
 #include "crow.h"
-#include <nlohmann/json.hpp>
-#include <bits/stdc++.h>
+#include "JsonDB.h" // Include your new class header
+#include <iostream>
 
-using namespace std;
-using json = nlohmann::json;
+// Create a global instance of the Database
+JsonDB db("flight_database.json");
 
-json parth(const string& source, const string& destination) {
-    // Dummy implementation for demonstration
-    json paths = json::array();
-    paths.push_back({{"path_id", 1}, {"nodes", {"Hrishi", "Clite", "Gym"}}});
-    paths.push_back({{"path_id", 2}, {"nodes", {"Hrishi", "Main building", "Gym"}}});
-    paths.push_back({{"path_id", 3}, {"nodes", {"Hrishi", "Road", "GYm"}}});
-    return paths;
-}
-
-int main()
-{
+int main() {
     crow::SimpleApp app;
-    // mysql connector
+
     // ==========================================
-    // ROUTE 1: GET /health
-    // Check if server is alive
+    // ROUTE 1: Get All Airports
     // ==========================================
-    CROW_ROUTE(app, "/health")
+    CROW_ROUTE(app, "/api/airports")
     ([](){
-        json response;
-        response["status"] = "running";
-        response["port"] = 18080;
-        auto res = crow::response(response.dump());
-        res.set_header("Content-Type", "application/json");
-        return res;
+        json airports = db.get_all_airports();
+        return crow::response(airports.dump());
     });
 
     // ==========================================
-    // ROUTE 2: POST /api/user
-    // Save User to JSON File
+    // ROUTE 2: Get Flights (Limit: 10)
     // ==========================================
-    CROW_ROUTE(app, "/api/user").methods(crow::HTTPMethod::POST)
+    CROW_ROUTE(app, "/api/flights")
     ([](const crow::request& req){
-        
-        auto req_body = json::parse(req.body, nullptr, false); // parse JSON body
-
-        // Validate JSON
-        if (req_body.is_discarded()) {
-            return crow::response(400, "Invalid JSON");
+        int limit = 10;
+        if (req.url_params.get("limit") != nullptr) {
+            limit = std::stoi(req.url_params.get("limit"));
         }
-
-        // Extract data from JSON
-        string name = req_body["username"];
-        int age = req_body["age"];
-
-        // json object for response
-        json response_data; 
-        response_data["status"] = "success";
-        response_data["message"] = "User " + name + " saved to file!";
-        response_data["user"] = new_user;
-
-        auto res = crow::response(201, response_data.dump());
-        res.set_header("Content-Type", "application/json");
-        return res;
+        json flights = db.get_flights_limited(limit);
+        return crow::response(flights.dump());
     });
 
-    // get method to search with two params source and destination 
-    CROW_ROUTE(app,"/api/search").methods(crow::HTTPMethod::GET)
+    // ==========================================
+    // ROUTE 3: Search (Source & Destination)
+    // URL: /api/search?from=JFK&to=LHR
+    // ==========================================
+    CROW_ROUTE(app, "/api/search")
     ([](const crow::request& req){
-        string source = req.url_params.get("source");
-        string destination = req.url_params.get("destination");
+        const char* src = req.url_params.get("from");
+        const char* dst = req.url_params.get("to");
 
-        if (source.empty() || destination.empty()) {
-            json error;
-            error["status"] = "error";
-            error["message"] = "Missing 'source' or 'destination' parameter";
-            auto res = crow::response(400, error.dump());
-            res.set_header("Content-Type", "application/json");
-            return res;
-        }
+        if (!src || !dst) return crow::response(400, "Missing 'from' or 'to'");
 
-        // Call parth function and get 3 paths
-        json result_paths = parth(source, destination);
-
-        // Prepare response
-        json response;
-        response["status"] = "success";
-        response["source"] = source;
-        response["destination"] = destination;
-        response["paths_found"] = result_paths.size();
-        response["paths"] = result_paths;
-
-        auto res = crow::response(200, response.dump());
-        res.set_header("Content-Type", "application/json");
-        return res;
+        json result = db.search_flights(src, dst);
+        return crow::response(result.dump());
     });
 
     // ==========================================
-    // ROUTE 3: GET /users
-    // Retrieve all users
+    // ROUTE 4: Search (Date)
+    // URL: /api/search_date?date=2023-12-01
     // ==========================================
-    CROW_ROUTE(app, "/users")
-    ([](){
-        std::lock_guard<std::mutex> lock(db_mutex);
-        json db = load_db();
-        return crow::response(db.dump());
+    CROW_ROUTE(app, "/api/search_date")
+    ([](const crow::request& req){
+        const char* date = req.url_params.get("date");
+
+        if (!date) return crow::response(400, "Missing 'date'");
+
+        json result = db.search_flights_by_date(date);
+        return crow::response(result.dump());
     });
 
-    // ==========================================
-    // START SERVER
-    // ==========================================
+    std::cout << "Server starting on port 18080..." << std::endl;
     app.port(18080).multithreaded().run();
 }
-

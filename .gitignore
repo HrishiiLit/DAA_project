@@ -20,3 +20,10 @@ cmake-build-debug/
 # 4. Ignore Dependency Folders (if any)
 _deps/
 
+
+# 5. Ignore Logs and Temporary Files
+*.log
+
+#6. Ignore .vs Code Workspace Files
+*.code-workspace
+.vs/
