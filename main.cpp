@@ -1,5 +1,5 @@
 #include "crow.h"
-#include "JsonDB.h"
+#include "jsondb.h"
 #include <iostream>
 
 // Initialize Database (Auto-seeds if file missing)
