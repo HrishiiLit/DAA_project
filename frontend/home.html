@@ -7,457 +7,66 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: "Inter", "Segoe UI", sans-serif;
-        }
-
-        body {
-            background: #0f172a;
-            min-height: 100vh;
-            color: #e2e8f0;
-        }
-
-        /* Header Section */
-        .header {
-            background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
-            padding: 40px 20px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120"><path d="M0,0 Q300,60 600,30 T1200,50 L1200,0 Z" fill="rgba(255,255,255,0.05)"/></svg>') repeat-x;
-            opacity: 0.3;
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            position: relative;
-            z-index: 1;
-        }
-
-        .logo-section {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-
-        .logo-icon {
-            width: 50px;
-            height: 50px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: #fbbf24;
-            backdrop-filter: blur(10px);
-        }
-
-        .logo-text h1 {
-            font-size: 28px;
-            font-weight: 700;
-            color: white;
-            letter-spacing: -0.5px;
-        }
-
-        .logo-text p {
-            font-size: 14px;
-            color: rgba(255,255,255,0.8);
-        }
-
-        /* Search Panel */
-        .search-panel {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
-        }
-
-        .search-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 25px;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 15px;
-        }
-
-        .tab {
-            padding: 10px 20px;
-            background: transparent;
-            border: none;
-            font-size: 15px;
-            font-weight: 600;
-            color: #64748b;
-            cursor: pointer;
-            border-radius: 8px 8px 0 0;
-            transition: all 0.3s;
-        }
-
-        .tab.active {
-            color: #1e40af;
-            background: #eff6ff;
-        }
-
-        .search-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .input-field {
-            position: relative;
-        }
-
-        .input-field label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            color: #475569;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .input-wrapper {
-            position: relative;
-        }
-
-        .input-wrapper i {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #1e40af;
-            font-size: 18px;
-        }
-
-        .input-field input,
-        .input-field select {
-            width: 100%;
-            padding: 14px 14px 14px 45px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 15px;
-            font-weight: 500;
-            color: #1e293b;
-            background: #f8fafc;
-            transition: all 0.3s;
-        }
-
-        .input-field input:focus,
-        .input-field select:focus {
-            outline: none;
-            border-color: #1e40af;
-            background: white;
-            box-shadow: 0 0 0 4px rgba(30, 64, 175, 0.1);
-        }
-
-        .search-button {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
-            border: none;
-            border-radius: 12px;
-            color: white;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            transition: all 0.3s;
-            box-shadow: 0 10px 25px rgba(30, 64, 175, 0.3);
-        }
-
-        .search-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 35px rgba(30, 64, 175, 0.4);
-        }
-
-        /* Main Content */
-        .main-content {
-            max-width: 1400px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        .section-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: white;
-        }
-
-        .filter-chips {
-            display: flex;
-            gap: 10px;
-        }
-
-        .chip {
-            padding: 8px 16px;
-            background: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 20px;
-            font-size: 13px;
-            color: #cbd5e1;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .chip:hover,
-        .chip.active {
-            background: #1e40af;
-            border-color: #1e40af;
-            color: white;
-        }
-
-        /* Map Section */
-        .map-section {
-            background: #1e293b;
-            border-radius: 16px;
-            overflow: hidden;
-            margin-bottom: 30px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-        }
-
-        .map-header {
-            padding: 20px 30px;
-            background: #334155;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .map-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #f1f5f9;
-        }
-
-        #map {
-            width: 100%;
-            height: 400px;
-            background: #0f172a;
-        }
-
-        /* Flight Results - Table View */
-        .flights-table {
-            background: #1e293b;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-        }
-
-        .table-header {
-            display: grid;
-            grid-template-columns: 2.5fr 2fr 1.5fr 1fr 1fr;
-            padding: 20px 30px;
-            background: #334155;
-            font-size: 12px;
-            font-weight: 700;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .flight-row {
-            display: grid;
-            grid-template-columns: 2.5fr 2fr 1.5fr 1fr 1fr;
-            padding: 25px 30px;
-            align-items: center;
-            border-bottom: 1px solid #334155;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .flight-row:hover {
-            background: #2d3748;
-        }
-
-        .flight-row:last-child {
-            border-bottom: none;
-        }
-
-        .airline-cell {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .airline-logo {
-            width: 45px;
-            height: 45px;
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            color: white;
-        }
-
-        .airline-info h4 {
-            font-size: 16px;
-            font-weight: 600;
-            color: #f1f5f9;
-            margin-bottom: 4px;
-        }
-
-        .airline-info p {
-            font-size: 13px;
-            color: #94a3b8;
-        }
-
-        .route-cell {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .route-point {
-            text-align: center;
-        }
-
-        .route-time {
-            font-size: 18px;
-            font-weight: 600;
-            color: #f1f5f9;
-        }
-
-        .route-code {
-            font-size: 12px;
-            color: #94a3b8;
-        }
-
-        .route-line {
-            flex: 1;
-            height: 2px;
-            background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
-            position: relative;
-        }
-
-        .route-line::after {
-            content: '✈';
-            position: absolute;
-            right: -8px;
-            top: -8px;
-            font-size: 14px;
-            color: #3b82f6;
-        }
-
-        .duration-cell {
-            text-align: center;
-        }
-
-        .duration-time {
-            font-size: 15px;
-            font-weight: 600;
-            color: #f1f5f9;
-            margin-bottom: 4px;
-        }
-
-        .duration-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            background: rgba(34, 197, 94, 0.2);
-            color: #4ade80;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        .price-cell {
-            text-align: center;
-        }
-
-        .price-amount {
-            font-size: 24px;
-            font-weight: 700;
-            color: #fbbf24;
-            margin-bottom: 4px;
-        }
-
-        .price-label {
-            font-size: 11px;
-            color: #64748b;
-        }
-
-        .action-cell {
-            text-align: center;
-        }
-
-        .book-button {
-            padding: 10px 24px;
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            border: none;
-            border-radius: 8px;
-            color: white;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .book-button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
-        }
-
-        /* Responsive */
-        @media(max-width: 1200px) {
-            .table-header,
-            .flight-row {
-                grid-template-columns: 2fr 2fr 1fr 1fr;
-            }
-
-            .duration-cell {
-                display: none;
-            }
-        }
-
-        @media(max-width: 900px) {
-            .search-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .table-header {
-                display: none;
-            }
-
-            .flight-row {
-                grid-template-columns: 1fr;
-                gap: 15px;
-                padding: 20px;
-            }
-
-            .route-cell,
-            .price-cell,
-            .action-cell {
-                justify-content: flex-start;
-            }
-        }
+        /* [YOUR CSS REMAINS EXACTLY THE SAME] */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Inter", "Segoe UI", sans-serif; }
+        body { background: #0f172a; min-height: 100vh; color: #e2e8f0; }
+        .header { background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%); padding: 40px 20px; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120"><path d="M0,0 Q300,60 600,30 T1200,50 L1200,0 Z" fill="rgba(255,255,255,0.05)"/></svg>') repeat-x; opacity: 0.3; }
+        .header-content { max-width: 1400px; margin: 0 auto; position: relative; z-index: 1; }
+        .logo-section { display: flex; align-items: center; gap: 15px; margin-bottom: 30px; }
+        .logo-icon { width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #fbbf24; backdrop-filter: blur(10px); }
+        .logo-text h1 { font-size: 28px; font-weight: 700; color: white; letter-spacing: -0.5px; }
+        .logo-text p { font-size: 14px; color: rgba(255,255,255,0.8); }
+        .search-panel { background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); border-radius: 20px; padding: 30px; box-shadow: 0 25px 50px rgba(0,0,0,0.3); }
+        .search-tabs { display: flex; gap: 10px; margin-bottom: 25px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; }
+        .tab { padding: 10px 20px; background: transparent; border: none; font-size: 15px; font-weight: 600; color: #64748b; cursor: pointer; border-radius: 8px 8px 0 0; transition: all 0.3s; }
+        .tab.active { color: #1e40af; background: #eff6ff; }
+        .search-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .input-field { position: relative; }
+        .input-field label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .input-wrapper { position: relative; }
+        .input-wrapper i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #1e40af; font-size: 18px; }
+        .input-field input, .input-field select { width: 100%; padding: 14px 14px 14px 45px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 15px; font-weight: 500; color: #1e293b; background: #f8fafc; transition: all 0.3s; }
+        .input-field input:focus, .input-field select:focus { outline: none; border-color: #1e40af; background: white; box-shadow: 0 0 0 4px rgba(30, 64, 175, 0.1); }
+        .search-button { width: 100%; padding: 16px; background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%); border: none; border-radius: 12px; color: white; font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.3s; box-shadow: 0 10px 25px rgba(30, 64, 175, 0.3); }
+        .search-button:hover { transform: translateY(-2px); box-shadow: 0 15px 35px rgba(30, 64, 175, 0.4); }
+        .main-content { max-width: 1400px; margin: 40px auto; padding: 0 20px; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .section-title { font-size: 24px; font-weight: 700; color: white; }
+        .filter-chips { display: flex; gap: 10px; }
+        .chip { padding: 8px 16px; background: #1e293b; border: 1px solid #334155; border-radius: 20px; font-size: 13px; color: #cbd5e1; cursor: pointer; transition: all 0.3s; }
+        .chip:hover, .chip.active { background: #1e40af; border-color: #1e40af; color: white; }
+        .map-section { background: #1e293b; border-radius: 16px; overflow: hidden; margin-bottom: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .map-header { padding: 20px 30px; background: #334155; display: flex; justify-content: space-between; align-items: center; }
+        .map-title { font-size: 18px; font-weight: 700; color: #f1f5f9; }
+        #map { width: 100%; height: 400px; background: #0f172a; }
+        .flights-table { background: #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .table-header { display: grid; grid-template-columns: 2.5fr 2fr 1.5fr 1fr 1fr; padding: 20px 30px; background: #334155; font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+        .flight-row { display: grid; grid-template-columns: 2.5fr 2fr 1.5fr 1fr 1fr; padding: 25px 30px; align-items: center; border-bottom: 1px solid #334155; transition: all 0.3s; cursor: pointer; }
+        .flight-row:hover { background: #2d3748; }
+        .flight-row:last-child { border-bottom: none; }
+        .airline-cell { display: flex; align-items: center; gap: 15px; }
+        .airline-logo { width: 45px; height: 45px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; }
+        .airline-info h4 { font-size: 16px; font-weight: 600; color: #f1f5f9; margin-bottom: 4px; }
+        .airline-info p { font-size: 13px; color: #94a3b8; }
+        .route-cell { display: flex; align-items: center; gap: 12px; }
+        .route-point { text-align: center; }
+        .route-time { font-size: 18px; font-weight: 600; color: #f1f5f9; }
+        .route-code { font-size: 12px; color: #94a3b8; }
+        .route-line { flex: 1; height: 2px; background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%); position: relative; }
+        .route-line::after { content: '✈'; position: absolute; right: -8px; top: -8px; font-size: 14px; color: #3b82f6; }
+        .duration-cell { text-align: center; }
+        .duration-time { font-size: 15px; font-weight: 600; color: #f1f5f9; margin-bottom: 4px; }
+        .duration-badge { display: inline-block; padding: 4px 10px; background: rgba(34, 197, 94, 0.2); color: #4ade80; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .price-cell { text-align: center; }
+        .price-amount { font-size: 24px; font-weight: 700; color: #fbbf24; margin-bottom: 4px; }
+        .price-label { font-size: 11px; color: #64748b; }
+        .action-cell { text-align: center; }
+        .book-button { padding: 10px 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; border-radius: 8px; color: white; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .book-button:hover { transform: scale(1.05); box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4); }
+        .loader { text-align: center; padding: 20px; color: #fff; display: none; }
+        @media(max-width: 1200px) { .table-header, .flight-row { grid-template-columns: 2fr 2fr 1fr 1fr; } .duration-cell { display: none; } }
+        @media(max-width: 900px) { .search-grid { grid-template-columns: 1fr; } .table-header { display: none; } .flight-row { grid-template-columns: 1fr; gap: 15px; padding: 20px; } .route-cell, .price-cell, .action-cell { justify-content: flex-start; } }
     </style>
 </head>
 <body>
@@ -465,75 +74,49 @@
     <div class="header">
         <div class="header-content">
             <div class="logo-section">
-                <div class="logo-icon">
-                    <i class="fas fa-plane-departure"></i>
-                </div>
-                <div class="logo-text">
-                    <h1>SkyBooker</h1>
-                    <p>Find your perfect flight</p>
-                </div>
+                <div class="logo-icon"><i class="fas fa-plane-departure"></i></div>
+                <div class="logo-text"><h1>SkyBooker</h1><p>Find your perfect flight</p></div>
             </div>
 
             <!-- Search Panel -->
             <div class="search-panel">
                 <div class="search-tabs">
-                    <button class="tab active">
-                        <i class="fas fa-plane"></i> One Way
-                    </button>
-                    <button class="tab">
-                        <i class="fas fa-exchange-alt"></i> Round Trip
-                    </button>
-                    <button class="tab">
-                        <i class="fas fa-route"></i> Multi-City
-                    </button>
+                    <button class="tab active"><i class="fas fa-plane"></i> One Way</button>
+                    <button class="tab"><i class="fas fa-exchange-alt"></i> Round Trip</button>
                 </div>
 
                 <div class="search-grid">
                     <div class="input-field">
                         <label>From</label>
-                        <div class="input-wrapper">
-                            <i class="fas fa-location-dot"></i>
-                            <select id="fromAirport">
-                                <option value="">Select departure city</option>
-                            </select>
+                        <div class="input-wrapper"><i class="fas fa-location-dot"></i>
+                            <select id="fromAirport"><option value="">Loading...</option></select>
                         </div>
                     </div>
 
                     <div class="input-field">
                         <label>To</label>
-                        <div class="input-wrapper">
-                            <i class="fas fa-map-pin"></i>
-                            <select id="toAirport">
-                                <option value="">Select arrival city</option>
-                            </select>
+                        <div class="input-wrapper"><i class="fas fa-map-pin"></i>
+                            <select id="toAirport"><option value="">Loading...</option></select>
                         </div>
                     </div>
 
                     <div class="input-field">
                         <label>Departure</label>
-                        <div class="input-wrapper">
-                            <i class="fas fa-calendar"></i>
-                            <input type="date" value="2025-12-01">
+                        <div class="input-wrapper"><i class="fas fa-calendar"></i>
+                            <input type="date" id="datePicker" value="2025-12-01">
                         </div>
                     </div>
 
                     <div class="input-field">
                         <label>Passengers</label>
-                        <div class="input-wrapper">
-                            <i class="fas fa-users"></i>
-                            <select>
-                                <option>1 Passenger, Economy</option>
-                                <option>2 Passengers, Economy</option>
-                                <option>1 Passenger, Business</option>
-                                <option>1 Passenger, First Class</option>
-                            </select>
+                        <div class="input-wrapper"><i class="fas fa-users"></i>
+                            <select><option>1 Passenger</option><option>2 Passengers</option></select>
                         </div>
                     </div>
                 </div>
 
-                <button class="search-button">
-                    <i class="fas fa-search"></i>
-                    Search Flights
+                <button class="search-button" onclick="searchFlights()">
+                    <i class="fas fa-search"></i> Search Flights
                 </button>
             </div>
         </div>
@@ -545,24 +128,17 @@
         <div class="map-section">
             <div class="map-header">
                 <h3 class="map-title">Route Map</h3>
-                <div style="font-size: 13px; color: #94a3b8;">
-                    <i class="fas fa-info-circle"></i> Select airports to see route
-                </div>
             </div>
             <div id="map"></div>
         </div>
 
         <div class="section-header">
-            <h2 class="section-title">Available Flights (125 results)</h2>
-            <div class="filter-chips">
-                <div class="chip active">Best Value</div>
-                <div class="chip">Cheapest</div>
-                <div class="chip">Fastest</div>
-                <div class="chip">Non-Stop</div>
-            </div>
+            <h2 class="section-title" id="resultsTitle">Available Flights</h2>
         </div>
 
-        <!-- Flights Table -->
+        <div id="loader" class="loader"><i class="fas fa-spinner fa-spin"></i> Searching...</div>
+
+        <!-- Flights Table (Dynamically Populated) -->
         <div class="flights-table">
             <div class="table-header">
                 <div>Airline</div>
@@ -571,118 +147,11 @@
                 <div>Price</div>
                 <div>Action</div>
             </div>
-
-            <div class="flight-row">
-                <div class="airline-cell">
-                    <div class="airline-logo">
-                        <i class="fas fa-plane"></i>
-                    </div>
-                    <div class="airline-info">
-                        <h4>IndiGo</h4>
-                        <p>6E-512 • Economy</p>
-                    </div>
-                </div>
-
-                <div class="route-cell">
-                    <div class="route-point">
-                        <div class="route-time">08:30</div>
-                        <div class="route-code">BOM</div>
-                    </div>
-                    <div class="route-line"></div>
-                    <div class="route-point">
-                        <div class="route-time">10:45</div>
-                        <div class="route-code">DEL</div>
-                    </div>
-                </div>
-
-                <div class="duration-cell">
-                    <div class="duration-time">2h 15m</div>
-                    <div class="duration-badge">Non-Stop</div>
-                </div>
-
-                <div class="price-cell">
-                    <div class="price-amount">₹4,299</div>
-                    <div class="price-label">per person</div>
-                </div>
-
-                <div class="action-cell">
-                    <button class="book-button">Book Now</button>
-                </div>
-            </div>
-
-            <div class="flight-row">
-                <div class="airline-cell">
-                    <div class="airline-logo">
-                        <i class="fas fa-jet-fighter"></i>
-                    </div>
-                    <div class="airline-info">
-                        <h4>Air India</h4>
-                        <p>AI-809 • Economy</p>
-                    </div>
-                </div>
-
-                <div class="route-cell">
-                    <div class="route-point">
-                        <div class="route-time">12:10</div>
-                        <div class="route-code">BLR</div>
-                    </div>
-                    <div class="route-line"></div>
-                    <div class="route-point">
-                        <div class="route-time">15:05</div>
-                        <div class="route-code">CCU</div>
-                    </div>
-                </div>
-
-                <div class="duration-cell">
-                    <div class="duration-time">2h 55m</div>
-                    <div class="duration-badge">Non-Stop</div>
-                </div>
-
-                <div class="price-cell">
-                    <div class="price-amount">₹5,780</div>
-                    <div class="price-label">per person</div>
-                </div>
-
-                <div class="action-cell">
-                    <button class="book-button">Book Now</button>
-                </div>
-            </div>
-
-            <div class="flight-row">
-                <div class="airline-cell">
-                    <div class="airline-logo">
-                        <i class="fas fa-plane-departure"></i>
-                    </div>
-                    <div class="airline-info">
-                        <h4>Vistara</h4>
-                        <p>UK-951 • Economy</p>
-                    </div>
-                </div>
-
-                <div class="route-cell">
-                    <div class="route-point">
-                        <div class="route-time">06:15</div>
-                        <div class="route-code">PNQ</div>
-                    </div>
-                    <div class="route-line"></div>
-                    <div class="route-point">
-                        <div class="route-time">07:10</div>
-                        <div class="route-code">GOI</div>
-                    </div>
-                </div>
-
-                <div class="duration-cell">
-                    <div class="duration-time">0h 55m</div>
-                    <div class="duration-badge">Non-Stop</div>
-                </div>
-
-                <div class="price-cell">
-                    <div class="price-amount">₹2,499</div>
-                    <div class="price-label">per person</div>
-                </div>
-
-                <div class="action-cell">
-                    <button class="book-button">Book Now</button>
+            
+            <div id="flightListContainer">
+                <!-- Flight rows will be injected here via JS -->
+                <div style="padding:40px; text-align:center; color:#64748b;">
+                    Please select a route and click Search.
                 </div>
             </div>
         </div>
@@ -690,54 +159,22 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Airport Dataset
-        const airports = [
-            { code: 'BOM', name: 'Mumbai (Chhatrapati Shivaji)', lat: 19.0896, lon: 72.8656 },
-            { code: 'DEL', name: 'Delhi (Indira Gandhi)', lat: 28.5562, lon: 77.1000 },
-            { code: 'BLR', name: 'Bangalore (Kempegowda)', lat: 13.1986, lon: 77.7066 },
-            { code: 'MAA', name: 'Chennai', lat: 12.9941, lon: 80.1709 },
-            { code: 'CCU', name: 'Kolkata (Netaji Subhas)', lat: 22.6547, lon: 88.4467 },
-            { code: 'HYD', name: 'Hyderabad (Rajiv Gandhi)', lat: 17.2403, lon: 78.4294 },
-            { code: 'PNQ', name: 'Pune', lat: 18.5822, lon: 73.9197 },
-            { code: 'AMD', name: 'Ahmedabad (Sardar Vallabhbhai)', lat: 23.0772, lon: 72.6347 },
-            { code: 'GOI', name: 'Goa (Dabolim)', lat: 15.3808, lon: 73.8314 },
-            { code: 'COK', name: 'Kochi (Cochin)', lat: 10.1520, lon: 76.4019 },
-            { code: 'JAI', name: 'Jaipur', lat: 26.8242, lon: 75.8122 },
-            { code: 'LKO', name: 'Lucknow', lat: 26.7606, lon: 80.8893 }
-        ];
+        // ==========================================
+        // 1. CONFIGURATION
+        // ==========================================
+        const BASE_URL = "https://daaproject-production.up.railway.app";
+        let allAirports = [];
 
-        // Initialize dropdowns
-        const fromSelect = document.getElementById('fromAirport');
-        const toSelect = document.getElementById('toAirport');
-
-        airports.forEach(airport => {
-            const option1 = document.createElement('option');
-            option1.value = airport.code;
-            option1.textContent = `${airport.name} (${airport.code})`;
-            fromSelect.appendChild(option1);
-
-            const option2 = document.createElement('option');
-            option2.value = airport.code;
-            option2.textContent = `${airport.name} (${airport.code})`;
-            toSelect.appendChild(option2);
-        });
-
-        // Set default values
-        fromSelect.value = 'BOM';
-        toSelect.value = 'DEL';
-
-        // Initialize map
+        // ==========================================
+        // 2. MAP INITIALIZATION
+        // ==========================================
         const map = L.map('map').setView([20.5937, 78.9629], 5);
-
-        // Add tile layer with dark theme
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
             maxZoom: 19
         }).addTo(map);
 
         let fromMarker, toMarker, routeLine;
-
-        // Custom icon for markers
         const airportIcon = L.divIcon({
             className: 'custom-marker',
             html: '<div style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);"><i class="fas fa-plane" style="font-size: 14px;"></i></div>',
@@ -745,69 +182,159 @@
             iconAnchor: [15, 15]
         });
 
-        // modal function
-        function modal(message) {
-            alert(message);
+        // ==========================================
+        // 3. API FUNCTIONS
+        // ==========================================
+        
+        // Fetch Airports from C++ Backend
+        async function loadAirports() {
+            try {
+                const res = await fetch(`${BASE_URL}/api/airports`);
+                allAirports = await res.json();
+                
+                const fromSelect = document.getElementById('fromAirport');
+                const toSelect = document.getElementById('toAirport');
+                
+                let options = '<option value="">Select city</option>';
+                allAirports.forEach(apt => {
+                    options += `<option value="${apt.code}">${apt.city} (${apt.code})</option>`;
+                });
+
+                fromSelect.innerHTML = options;
+                toSelect.innerHTML = options;
+                
+                console.log("Airports loaded:", allAirports.length);
+            } catch (error) {
+                console.error("Failed to load airports:", error);
+                alert("Could not connect to backend server.");
+            }
         }
 
-        function updateMap() {
-            const fromCode = fromSelect.value;
-            const toCode = toSelect.value;
-            if (fromCode === toCode) modal("Select different airports for departure and arrival.");
-            if (!fromCode || !toCode) return;
+        // Search Flights
+        async function searchFlights() {
+            const fromCode = document.getElementById('fromAirport').value;
+            const toCode = document.getElementById('toAirport').value;
+            const container = document.getElementById('flightListContainer');
+            const loader = document.getElementById('loader');
 
-            const fromAirport = airports.find(a => a.code === fromCode);
-            const toAirport = airports.find(a => a.code === toCode);
+            if(!fromCode || !toCode) {
+                alert("Please select both Source and Destination.");
+                return;
+            }
 
-            // Remove existing markers and lines
+            // Update Map
+            updateMap(fromCode, toCode);
+
+            // UI Loading State
+            container.innerHTML = "";
+            loader.style.display = "block";
+
+            try {
+                // Fetch from your live API
+                const res = await fetch(`${BASE_URL}/api/search?from=${fromCode}&to=${toCode}`);
+                const flights = await res.json();
+                
+                loader.style.display = "none";
+                document.getElementById('resultsTitle').innerText = `Available Flights (${flights.length} results)`;
+
+                if(flights.length === 0) {
+                    container.innerHTML = `<div style="padding:40px; text-align:center;">No flights found for this route.</div>`;
+                    return;
+                }
+
+                // Render Flights
+                flights.forEach(f => {
+                    const row = `
+                    <div class="flight-row">
+                        <div class="airline-cell">
+                            <div class="airline-logo"><i class="fas fa-plane"></i></div>
+                            <div class="airline-info">
+                                <h4>${f.airline || "Airline"}</h4>
+                                <p>${f.id} • Economy</p>
+                            </div>
+                        </div>
+
+                        <div class="route-cell">
+                            <div class="route-point">
+                                <div class="route-time">${f.departure}</div>
+                                <div class="route-code">${f.from_code}</div>
+                            </div>
+                            <div class="route-line"></div>
+                            <div class="route-point">
+                                <div class="route-time">${f.arrival}</div>
+                                <div class="route-code">${f.to_code}</div>
+                            </div>
+                        </div>
+
+                        <div class="duration-cell">
+                            <div class="duration-time">${f.duration}</div>
+                            <div class="duration-badge">Non-Stop</div>
+                        </div>
+
+                        <div class="price-cell">
+                            <div class="price-amount">₹${f.price}</div>
+                            <div class="price-label">per person</div>
+                        </div>
+
+                        <div class="action-cell">
+                            <button class="book-button" onclick="alert('Booking feature coming soon for ${f.id}!')">Book Now</button>
+                        </div>
+                    </div>
+                    `;
+                    container.innerHTML += row;
+                });
+
+            } catch (error) {
+                loader.style.display = "none";
+                container.innerHTML = `<div style="padding:20px; text-align:center; color:red;">Error fetching flights.</div>`;
+                console.error(error);
+            }
+        }
+
+        // ==========================================
+        // 4. MAP LOGIC
+        // ==========================================
+        function updateMap(fromCode, toCode) {
+            const fromAirport = allAirports.find(a => a.code === fromCode);
+            const toAirport = allAirports.find(a => a.code === toCode);
+
+            if (!fromAirport || !toAirport) return;
+
+            // Remove existing layers
             if (fromMarker) map.removeLayer(fromMarker);
             if (toMarker) map.removeLayer(toMarker);
             if (routeLine) map.removeLayer(routeLine);
 
-            // Add markers
-            fromMarker = L.marker([fromAirport.lat, fromAirport.lon], { icon: airportIcon })
-                .addTo(map)
+            // Note: Backend JSON uses "long" for longitude, Leaflet expects [lat, lng]
+            const fromLatLng = [fromAirport.lat, fromAirport.long];
+            const toLatLng = [toAirport.lat, toAirport.long];
+
+            // Add Markers
+            fromMarker = L.marker(fromLatLng, { icon: airportIcon }).addTo(map)
                 .bindPopup(`<b>${fromAirport.name}</b><br>${fromAirport.code}`);
 
-            toMarker = L.marker([toAirport.lat, toAirport.lon], { icon: airportIcon })
-                .addTo(map)
+            toMarker = L.marker(toLatLng, { icon: airportIcon }).addTo(map)
                 .bindPopup(`<b>${toAirport.name}</b><br>${toAirport.code}`);
 
-            // Draw route line with curve effect
-            const latlngs = [
-                [fromAirport.lat, fromAirport.lon],
-                [toAirport.lat, toAirport.lon]
-            ];
-
-            routeLine = L.polyline(latlngs, {
-                color: '#3b82f6',
-                weight: 3,
-                opacity: 0.7,
-                dashArray: '10, 10',
-                lineJoin: 'round'
+            // Draw Route
+            routeLine = L.polyline([fromLatLng, toLatLng], {
+                color: '#3b82f6', weight: 3, opacity: 0.7, dashArray: '10, 10', lineJoin: 'round'
             }).addTo(map);
 
-            // Fit map to show both airports
-            const bounds = L.latLngBounds([
-                [fromAirport.lat, fromAirport.lon],
-                [toAirport.lat, toAirport.lon]
-            ]);
-            map.fitBounds(bounds, { padding: [50, 50] });
+            // Fit Bounds
+            map.fitBounds(L.latLngBounds(fromLatLng, toLatLng), { padding: [50, 50] });
 
-            // Animate the line
+            // Animate Line
             let offset = 0;
             setInterval(() => {
                 offset += 2;
-                routeLine.setStyle({ dashOffset: offset.toString() });
+                if(routeLine) routeLine.setStyle({ dashOffset: offset.toString() });
             }, 100);
         }
 
-        // Event listeners
-        fromSelect.addEventListener('change', updateMap);
-        toSelect.addEventListener('change', updateMap);
+        // Load airports on startup
+        loadAirports();
 
-        // Initial map update
-        updateMap();
     </script>
 </body>
 </html>

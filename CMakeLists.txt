@@ -1,68 +1,80 @@
 cmake_minimum_required(VERSION 3.20)
-project(MyCppBackend)
+project(FlightBackend LANGUAGES CXX)
 
+# ============================================================
+# Compiler settings
+# ============================================================
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ==========================================
-# PATCH: Set policy for old CMake versions in dependencies
-# ==========================================
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
-
-# ==========================================
-# 1. SETUP: Prevent Errors & Define Variables
-# ==========================================
-# Prevent Crow from building its own tests (fixes previous error)
-set(CROW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(CROW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-
-# Fix for Windows network compatibility
-if(WIN32)
-    add_definitions(-D_WIN32_WINNT=0x0601)
+# Force static linking for MinGW (Prevents missing DLL errors on other PCs)
+if(MINGW)
+    set(CMAKE_EXE_LINKER_FLAGS "-static -static-libgcc -static-libstdc++")
 endif()
 
+find_package(Threads REQUIRED)
+
+if(WIN32)
+    add_definitions(-D_WIN32_WINNT=0x0601) # Target Windows 7 or later
+endif()
+
+# ============================================================
+# FetchContent Setup
+# ============================================================
 include(FetchContent)
 
-# ==========================================
-# 2. DOWNLOAD DEPENDENCY: ASIO (Networking)
-# ==========================================
+# 1. ASIO (Standalone, no Boost)
 FetchContent_Declare(
-  asio
-  URL https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-30-2.zip
+    asio
+    URL https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-30-2.zip
 )
 FetchContent_MakeAvailable(asio)
 
-# CRITICAL: Tell Crow where to find the Asio we just downloaded
-set(ASIO_INCLUDE_DIR ${asio_SOURCE_DIR}/asio/include CACHE PATH "Path to Asio" FORCE)
-
-# ==========================================
-# 3. DOWNLOAD LIBRARY: CROW (Web Server)
-# ==========================================
-FetchContent_Declare(
-  Crow
-  URL https://github.com/CrowCpp/Crow/archive/refs/heads/master.zip
-)
-FetchContent_MakeAvailable(Crow)
-
-# ==========================================
-# 4. DOWNLOAD LIBRARY: JSON
-# ==========================================
+# 2. JSON (Nlohmann)
 FetchContent_Declare(
     json
-    URL https://github.com/nlohmann/json/archive/refs/tags/v3.11.2.zip
+    URL https://github.com/nlohmann/json/archive/refs/tags/v3.11.3.zip
 )
 FetchContent_MakeAvailable(json)
 
-# ==========================================
-# 5. BUILD THE APP
-# ==========================================
-add_executable(server_app main.cpp jsondb.cpp)
+# 3. CROW (Web Framework)
+set(CROW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(CROW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(CROW_USE_BOOST OFF CACHE BOOL "" FORCE) # Ensure we use ASIO, not Boost
 
-# Link everything together
+FetchContent_Declare(
+    Crow
+    # Using v1.2.0 (Latest stable)
+    URL https://github.com/CrowCpp/Crow/archive/refs/tags/v1.2.0.zip
+)
+FetchContent_MakeAvailable(Crow)
+
+# ============================================================
+# Build the final executable
+# ============================================================
+# NOTE: Ensure the file name here matches exactly what is on your disk
+add_executable(server_app main.cpp JsonDB.cpp) 
+
+# Include ASIO headers explicitly if Crow doesn't pick them up automatically
+target_include_directories(server_app PRIVATE
+    ${asio_SOURCE_DIR}/asio/include
+)
+
+# ============================================================
+# Link libraries
+# ============================================================
 if(WIN32)
-    # Windows needs 'ws2_32' (Winsock) and 'mswsock'
-    target_link_libraries(server_app PRIVATE Crow::Crow nlohmann_json::nlohmann_json ws2_32 mswsock)
+    target_link_libraries(server_app PRIVATE 
+        Crow::Crow 
+        nlohmann_json::nlohmann_json
+        Threads::Threads 
+        ws2_32 
+        mswsock
+    )
 else()
-    target_link_libraries(server_app PRIVATE Crow::Crow nlohmann_json::nlohmann_json)
+    target_link_libraries(server_app PRIVATE 
+        Crow::Crow 
+        nlohmann_json::nlohmann_json
+        Threads::Threads
+    )
 endif()
