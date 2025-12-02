@@ -56,7 +56,7 @@ FetchContent_MakeAvailable(Crow)
 # Build the final executable
 # ============================================================
 # NOTE: Ensure the file name here matches exactly what is on your disk
-add_executable(server_app main.cpp JsonDB.cpp) 
+add_executable(server_app main.cpp jsondb.cpp) 
 
 # Include ASIO headers explicitly if Crow doesn't pick them up automatically
 target_include_directories(server_app PRIVATE

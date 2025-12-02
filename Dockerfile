@@ -17,6 +17,7 @@ COPY main.cpp .
 COPY jsondb.h .
 COPY jsondb.cpp .
 COPY Models.h .
+COPY algo.cpp .
 
 # Build the application
 RUN cmake -B build -G "Unix Makefiles" \
