@@ -112,10 +112,101 @@ json JsonDB::search_flights_by_date(const std::string& date) {
     }
     return result;
 }
+// ==========================================
+// ADMIN IMPLEMENTATION
+// ==========================================
 
-void JsonDB::add_flight(const json& flight_data) {
+// --- AIRPORTS ---
+bool JsonDB::add_airport(const json& airport_data) {
+    std::lock_guard<std::mutex> lock(db_mutex);
+    if (!data.contains("airports")) data["airports"] = json::array();
+    
+    // Check duplicate
+    std::string new_code = airport_data.value("code", "");
+    for(const auto& apt : data["airports"]) {
+        if(apt.value("code", "") == new_code) return false; // Exists
+    }
+
+    data["airports"].push_back(airport_data);
+    save();
+    return true;
+}
+
+bool JsonDB::delete_airport(const std::string& code) {
+    std::lock_guard<std::mutex> lock(db_mutex);
+    if (!data.contains("airports")) return false;
+
+    auto& arr = data["airports"];
+    for (auto it = arr.begin(); it != arr.end(); ++it) {
+        if ((*it).value("code", "") == code) {
+            arr.erase(it);
+            save();
+            return true;
+        }
+    }
+    return false;
+}
+
+bool JsonDB::update_airport(const std::string& code, const json& new_data) {
+    std::lock_guard<std::mutex> lock(db_mutex);
+    if (!data.contains("airports")) return false;
+
+    for (auto& apt : data["airports"]) {
+        if (apt.value("code", "") == code) {
+            // Update fields provided in new_data
+            for (auto& el : new_data.items()) {
+                apt[el.key()] = el.value();
+            }
+            save();
+            return true;
+        }
+    }
+    return false;
+}
+
+// --- FLIGHTS ---
+bool JsonDB::add_flight(const json& flight_data) {
     std::lock_guard<std::mutex> lock(db_mutex);
     if (!data.contains("flights")) data["flights"] = json::array();
+    
+    // Check duplicate ID
+    std::string new_id = flight_data.value("id", "");
+    for(const auto& fl : data["flights"]) {
+        if(fl.value("id", "") == new_id) return false;
+    }
+
     data["flights"].push_back(flight_data);
     save();
+    return true;
+}
+
+bool JsonDB::delete_flight(const std::string& id) {
+    std::lock_guard<std::mutex> lock(db_mutex);
+    if (!data.contains("flights")) return false;
+
+    auto& arr = data["flights"];
+    for (auto it = arr.begin(); it != arr.end(); ++it) {
+        if ((*it).value("id", "") == id) {
+            arr.erase(it);
+            save();
+            return true;
+        }
+    }
+    return false;
+}
+
+bool JsonDB::update_flight(const std::string& id, const json& new_data) {
+    std::lock_guard<std::mutex> lock(db_mutex);
+    if (!data.contains("flights")) return false;
+
+    for (auto& fl : data["flights"]) {
+        if (fl.value("id", "") == id) {
+            for (auto& el : new_data.items()) {
+                fl[el.key()] = el.value();
+            }
+            save();
+            return true;
+        }
+    }
+    return false;
 }

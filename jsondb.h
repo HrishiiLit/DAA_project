@@ -12,24 +12,29 @@ class JsonDB {
 private:
     std::string filename;
     json data;
-    std::mutex db_mutex; // Handles thread safety
+    std::mutex db_mutex;
 
-    // Helper functions (internal use only)
-    void seed_data(); // Generates dummy data if file is empty
-    void save();      // Saves JSON to disk
+    void seed_data();
+    void save();
 
 public:
-    // Constructor
     JsonDB(const std::string& fname);
 
-    // API Functions
+    // --- PUBLIC APIs --- //
     json get_all_airports();
     json get_flights_limited(int limit);
     json search_flights(const std::string& src, const std::string& dst);
     json search_flights_by_date(const std::string& date);
-    
-    // Optional: Add a flight
-    void add_flight(const json& flight_data);
+
+    // --- ADMIN APIs (Airports) --- //
+    bool add_airport(const json& airport_data);
+    bool delete_airport(const std::string& code);
+    bool update_airport(const std::string& code, const json& new_data);
+
+    // --- ADMIN APIs (Flights) --- //
+    bool add_flight(const json& flight_data);
+    bool delete_flight(const std::string& id);
+    bool update_flight(const std::string& id, const json& new_data);
 };
 
 #endif
