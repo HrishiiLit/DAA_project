@@ -155,7 +155,8 @@ int main() {
         }
     });
 
-    std::cout << "Server running on port " << std::getenv("PORT") ? std::getenv("PORT") : "18080" << std::endl;
+    const char* port_env = std::getenv("PORT");
+    std::cout << "Server running on port " << (port_env ? port_env : "18080") << std::endl;
     
     // Railway requires listening on 0.0.0.0 and the $PORT env variable
     int port = 18080;
