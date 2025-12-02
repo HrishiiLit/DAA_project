@@ -16,6 +16,7 @@ COPY CMakeLists.txt .
 COPY main.cpp .
 COPY jsondb.h .
 COPY jsondb.cpp .
+COPY Models.h .
 
 # Build the application
 RUN cmake -B build -G "Unix Makefiles" \
