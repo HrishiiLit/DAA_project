@@ -160,14 +160,16 @@ int main() {
         }
     });
 
-    const char* port_env = std::getenv("PORT");
-    std::cout << "Server running on port " << (port_env ? port_env : "18080") << std::endl;
-    
-    // Railway requires listening on 0.0.0.0 and the $PORT env variable
-    int port = 18080;
+    int port = 8080;  // Default to 8080 for cloud deployments
     if (const char* env_p = std::getenv("PORT")) {
-        port = std::stoi(env_p);
+        try {
+            port = std::stoi(env_p);
+        } catch (...) {
+            std::cerr << "Invalid PORT value, using default 8080" << std::endl;
+        }
     }
+    
+    std::cout << "Server starting on 0.0.0.0:" << port << std::endl;
     
     app.port(port).multithreaded().run();
 }

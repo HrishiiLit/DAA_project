@@ -40,12 +40,12 @@ COPY --from=builder /build/build/server_app /app/server_app
 # Copy database file if it exists (optional, will be created on first run)
 RUN if [ -f flight_database.json ]; then cp flight_database.json /app/; else echo "Database will be created on first run"; fi
 
-# Expose the port
-EXPOSE 18080
+# Expose the port (Cloud deployments use PORT env var)
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:18080/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
 # Run the application
 CMD ["/app/server_app"]
