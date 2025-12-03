@@ -19,6 +19,175 @@ void JsonDB::save() {
     std::ofstream file(filename);
     file << data.dump(4);
 }
+// Helper: "02h 15m" -> 135 minutes
+int JsonDB::parse_duration_string(const std::string& dur) {
+    try {
+        // Expected format "Xh Ym"
+        size_t h_pos = dur.find('h');
+        size_t m_pos = dur.find('m');
+        if (h_pos == std::string::npos) return 0;
+        
+        int hours = std::stoi(dur.substr(0, h_pos));
+        int mins = 0;
+        
+        // Find space between h and number
+        size_t space_pos = dur.find(' ');
+        if (space_pos != std::string::npos && m_pos != std::string::npos) {
+            mins = std::stoi(dur.substr(space_pos + 1, m_pos - space_pos - 1));
+        }
+        return (hours * 60) + mins;
+    } catch (...) {
+        return 60; // Default safe fallback
+    }
+}
+
+// Build Adjacency List from JSON
+void JsonDB::build_graph() {
+    adj_list.clear();
+    
+    if (!data.contains("flights")) return;
+
+    for (const auto& f : data["flights"]) {
+        Edge e;
+        e.destination = f["to_code"];
+        e.flight_id = f["id"];
+        e.date = f["date"];
+        e.dep_time = f["departure"];
+        e.arr_time = f["arrival"];
+        e.price = f["price"];
+        e.airline = f["airline"];
+        e.weight_minutes = parse_duration_string(f["duration"]);
+
+        // Add to Source bucket
+        adj_list[f["from_code"]].push_back(e);
+    }
+}
+
+// ==========================================
+// THE K-SHORTEST PATH ALGORITHM (Date Aware)
+// ==========================================
+struct PathState {
+    int total_minutes;
+    std::string current_node;
+    std::vector<Edge> history; // Stores the actual flights taken
+
+    // Priority Queue Comparator (Min-Heap based on time)
+    bool operator>(const PathState& other) const {
+        return total_minutes > other.total_minutes;
+    }
+};
+
+json JsonDB::find_smart_routes(const std::string& src, const std::string& dst, const std::string& req_date, int k) {
+    std::lock_guard<std::mutex> lock(db_mutex);
+    
+    json results = json::array();
+    
+    // Priority Queue: {Cost, CurrentNode, PathHistory}
+    std::priority_queue<PathState, std::vector<PathState>, std::greater<PathState>> pq;
+    
+    // Start at Source, 0 cost, empty history
+    pq.push({0, src, {}});
+
+    // To prevent infinite loops in cyclic graphs
+    // We count how many times we've finalized a path to a specific node
+    std::unordered_map<std::string, int> visits;
+
+    while (!pq.empty() && results.size() < k) {
+        PathState top = pq.top();
+        pq.pop();
+
+        std::string u = top.current_node;
+
+        // TARGET REACHED?
+        if (u == dst) {
+            // Convert history to JSON format
+            json route;
+            route["total_time"] = top.total_minutes;
+            route["stops"] = (int)top.history.size() - 1; // 1 flight = 0 stops
+            
+            json segments = json::array();
+            for(const auto& h : top.history) {
+                segments.push_back({
+                    {"airline", h.airline},
+                    {"flight_id", h.flight_id},
+                    {"from", (segments.empty() ? src : segments.back()["to"])}, // Logic inference
+                    {"to", h.destination},
+                    {"dep", h.dep_time},
+                    {"arr", h.arr_time},
+                    {"price", h.price}
+                });
+                // Fix "from" logic: The history stores edges. 
+                // The "from" of current edge is the "to" of previous edge.
+            }
+            
+            // Fix the "From" codes in segments
+            std::string prev_code = src;
+            for(auto& seg : segments) {
+                seg["from"] = prev_code;
+                prev_code = seg["to"];
+            }
+
+            route["segments"] = segments;
+            
+            // Calculate total price
+            int total_price = 0;
+            for(const auto& s : segments) total_price += (int)s["price"];
+            route["total_price"] = total_price;
+
+            results.push_back(route);
+            continue; 
+        }
+
+        // Optimization: Don't visit any node more than K times
+        if (visits[u] >= k) continue;
+        visits[u]++;
+
+        // EXPLORE FLIGHTS
+        if (adj_list.find(u) != adj_list.end()) {
+            for (const auto& edge : adj_list[u]) {
+                
+                // --- FILTER 1: DATE CHECK ---
+                if (edge.date != req_date) continue;
+
+                // --- FILTER 2: CYCLE CHECK ---
+                // Don't go back to a city we already visited in this path
+                bool cycle = false;
+                if (u == src) { /* safe */ } 
+                else {
+                    // Check history (heuristic: check previous edge's source)
+                    for(const auto& prev : top.history) {
+                         // Simple check: don't fly back to source
+                         if (edge.destination == src) cycle = true;
+                    }
+                }
+                if (cycle) continue;
+
+                // --- FILTER 3: CONNECTION TIME (Optional but good) ---
+                // If this is a connection, ensure Dep Time > Previous Arr Time
+                if (!top.history.empty()) {
+                    std::string prev_arr = top.history.back().arr_time;
+                    // String compare works for HH:MM (e.g. "14:00" > "12:00")
+                    if (edge.dep_time < prev_arr) continue; 
+                }
+
+                // Add to Queue
+                std::vector<Edge> new_history = top.history;
+                new_history.push_back(edge);
+                
+                // Add connection penalty (e.g., 60 mins layover assumption) if not direct
+                int layover = top.history.empty() ? 0 : 60; 
+
+                pq.push({
+                    top.total_minutes + edge.weight_minutes + layover, 
+                    edge.destination, 
+                    new_history
+                });
+            }
+        }
+    }
+
+    return results;
+}
 
 // ==========================================
 // SEEDING LOGIC (The Heavy Lifter)
