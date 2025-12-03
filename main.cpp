@@ -1,7 +1,11 @@
 #include "crow.h"
-#include "JsonDB.h"
+#include "jsondb.h"
+#include "Models.h"
 #include <iostream>
 #include <string>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 // ==========================================
 // 1. DEFINE CORS MIDDLEWARE
@@ -193,11 +197,15 @@ int main() {
     });
 
     // Port Logic
-    int port = 18080;
+    int port = 8080;  // Default to 8080 for cloud deployment
     if (const char* env_p = std::getenv("PORT")) {
-        port = std::stoi(env_p);
+        try {
+            port = std::stoi(env_p);
+        } catch (...) {
+            std::cerr << "Invalid PORT value, using default 8080" << std::endl;
+        }
     }
     
-    std::cout << "Server starting on port " << port << "..." << std::endl;
+    std::cout << "Server starting on 0.0.0.0:" << port << std::endl;
     app.port(port).multithreaded().run();
 }
