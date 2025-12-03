@@ -166,186 +166,270 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // ==========================================
-        // 1. CONFIGURATION
-        // ==========================================
-        const BASE_URL = "https://daa-project-api-services.onrender.com";
+// const BASE_URL = "https://daaproject-production.up.railway.app"; 
+const BASE_URL = "http://localhost:18080"; // Use this for local testing
+// CONFIGURATION
+const SOURCE = "DEL";
+const DEST = "BLR";
+const DATE = "2025-12-05"; // The date you will search for
+const INTERMEDIATE_HUBS = ["BOM", "HYD", "CCU", "MAA", "AMD"]; // Cities to stop at
+
+async function addFlight(flightData) {
+    try {
+        const res = await fetch(`${BASE_URL}/admin/flight/add`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(flightData)
+        });
+        return res.status === 201;
+    } catch (e) { return false; }
+}
+
+async function generateMultiPaths() {
+    console.log(`🚀 Generating paths from ${SOURCE} to ${DEST} on ${DATE}...`);
+
+    let flightCount = 1;
+
+    // 1. CREATE DIRECT FLIGHT (Fastest)
+    await addFlight({
+        id: `AUTO_DIRECT_${flightCount++}`,
+        airline: "IndiGo",
+        from_code: SOURCE,
+        to_code: DEST,
+        date: DATE,
+        departure: "09:00",
+        arrival: "11:30",
+        duration: "2h 30m",
+        price: 7500
+    });
+    console.log("✅ Added Direct Path");
+
+    // 2. CREATE CONNECTING PATHS
+    for (const hub of INTERMEDIATE_HUBS) {
+        // Leg 1: Source -> Hub (Morning Flight)
+        const leg1_Id = `AUTO_LEG1_${hub}_${flightCount++}`;
+        await addFlight({
+            id: leg1_Id,
+            airline: ["Air India", "Vistara", "SpiceJet"][Math.floor(Math.random()*3)],
+            from_code: SOURCE,
+            to_code: hub,
+            date: DATE,
+            departure: "06:00", // Early morning
+            arrival: "08:00",
+            duration: "2h 00m",
+            price: 3000 + Math.floor(Math.random() * 1000)
+        });
+
+        // Leg 2: Hub -> Dest (Afternoon Flight - Ensures valid connection time)
+        const leg2_Id = `AUTO_LEG2_${hub}_${flightCount++}`;
+        await addFlight({
+            id: leg2_Id,
+            airline: ["Air India", "Vistara", "Akasa Air"][Math.floor(Math.random()*3)],
+            from_code: hub,
+            to_code: DEST,
+            date: DATE,
+            departure: "10:00", // Departs 2 hours after Leg 1 arrives
+            arrival: "12:00",
+            duration: "2h 00m",
+            price: 3000 + Math.floor(Math.random() * 1000)
+        });
+
+        console.log(`✅ Added Path via ${hub}`);
+    }
+
+    console.log("✨ DONE! Now search for these exact airports and date on your website.");
+}
+
+generateMultiPaths();
         // const BASE_URL = "https://daaproject-production.up.railway.app";
+        // const BASE_URL = "http://localhost:18080"; // Use this for local testing
         let allAirports = [];
 
-        // ==========================================
-        // 2. MAP INITIALIZATION
-        // ==========================================
+        // Initialize Map
         const map = L.map('map').setView([20.5937, 78.9629], 5);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
             maxZoom: 19
         }).addTo(map);
 
-        let fromMarker, toMarker, routeLine;
         const airportIcon = L.divIcon({
             className: 'custom-marker',
             html: '<div style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);"><i class="fas fa-plane" style="font-size: 14px;"></i></div>',
-            iconSize: [30, 30],
-            iconAnchor: [15, 15]
+            iconSize: [30, 30], iconAnchor: [15, 15]
         });
 
-        // ==========================================
-        // 3. API FUNCTIONS
-        // ==========================================
-        
-        // Fetch Airports from C++ Backend
+        let mapLayers = [];
+
+        // 1. Load Airports
         async function loadAirports() {
             try {
-                console.log("Fetching airports from backend...");
                 const res = await fetch(`${BASE_URL}/api/airports`);
                 allAirports = await res.json();
                 
                 const fromSelect = document.getElementById('fromAirport');
                 const toSelect = document.getElementById('toAirport');
-                
                 let options = '<option value="">Select city</option>';
+                
+                // Sort airports alphabetically for better UX
+                allAirports.sort((a,b) => a.city.localeCompare(b.city));
+
                 allAirports.forEach(apt => {
                     options += `<option value="${apt.code}">${apt.city} (${apt.code})</option>`;
                 });
-                console.log(options);
+
                 fromSelect.innerHTML = options;
                 toSelect.innerHTML = options;
             } catch (error) {
-                console.error("Failed to load airports:", error);
-                alert("Could not connect to backend server. Ensure CORS is enabled on backend.");
+                console.error(error);
+                alert("Could not connect to backend.");
             }
         }
 
-        // Search Flights
+        // 2. Search Flights (Updated for Smart Routes)
         async function searchFlights() {
             const fromCode = document.getElementById('fromAirport').value;
             const toCode = document.getElementById('toAirport').value;
+            // Get date from picker or default
+            let dateVal = document.getElementById('datePicker') ? document.getElementById('datePicker').value : "2025-12-02";
+            
+            if(!fromCode || !toCode) return alert("Please select source and destination.");
+
             const container = document.getElementById('flightListContainer');
             const loader = document.getElementById('loader');
 
-            if(!fromCode || !toCode) {
-                alert("Please select both Source and Destination.");
-                return;
-            }
-
-            // Update Map
-            updateMap(fromCode, toCode);
-
-            // UI Loading State
             container.innerHTML = "";
             loader.style.display = "block";
 
+            // Clear map
+            mapLayers.forEach(l => map.removeLayer(l));
+            mapLayers = [];
+
             try {
-                // Fetch from your live API
-                const res = await fetch(`${BASE_URL}/api/search?from=${fromCode}&to=${toCode}`);
-                const flights = await res.json();
+                // Call the Smart Search Endpoint
+                const res = await fetch(`${BASE_URL}/api/search?from=${fromCode}&to=${toCode}&date=${dateVal}`);
+                const routes = await res.json();
                 
                 loader.style.display = "none";
-                document.getElementById('resultsTitle').innerText = `Available Flights (${flights.length} results)`;
+                document.getElementById('resultsTitle').innerText = `Available Flights (${routes.length})`;
 
-                if(flights.length === 0) {
-                    container.innerHTML = `<div style="padding:40px; text-align:center;">No flights found for this route.</div>`;
+                if(routes.length === 0) {
+                    container.innerHTML = `<div style="padding:40px; text-align:center;">No flights found for ${dateVal}. <br> Try checking dates between Dec 01 - Dec 10.</div>`;
                     return;
                 }
 
-                // Render Flights
-                flights.forEach(f => {
+                // Render Routes
+                routes.forEach((route, index) => {
+                    // Extract main details from the first segment
+                    const firstLeg = route.segments[0];
+                    const lastLeg = route.segments[route.segments.length - 1];
+                    const airline = firstLeg.airline;
+                    const stops = route.stops === 0 ? "Non-Stop" : `${route.stops} Stop(s)`;
+                    
+                    // Build path description if connecting
+                    let routeDesc = "";
+                    if(route.stops > 0) {
+                        const via = route.segments.map(s => s.to).slice(0, -1).join(", ");
+                        routeDesc = `<div style="font-size:11px; color:#94a3b8;">Via ${via}</div>`;
+                    }
+
+                    // Visualize on Map (Draw the first result by default)
+                    if(index === 0) drawRouteOnMap(route.segments);
+
                     const row = `
-                    <div class="flight-row">
+                    <div class="flight-row" onmouseenter='drawRouteOnMap(${JSON.stringify(route.segments)})'>
                         <div class="airline-cell">
                             <div class="airline-logo"><i class="fas fa-plane"></i></div>
                             <div class="airline-info">
-                                <h4>${f.airline || "Airline"}</h4>
-                                <p>${f.id} • Economy</p>
+                                <h4>${airline}</h4>
+                                <p>${firstLeg.flight_id}</p>
                             </div>
                         </div>
 
                         <div class="route-cell">
                             <div class="route-point">
-                                <div class="route-time">${f.departure}</div>
-                                <div class="route-code">${f.from_code}</div>
+                                <div class="route-time">${firstLeg.dep}</div>
+                                <div class="route-code">${firstLeg.from}</div>
                             </div>
                             <div class="route-line"></div>
                             <div class="route-point">
-                                <div class="route-time">${f.arrival}</div>
-                                <div class="route-code">${f.to_code}</div>
+                                <div class="route-time">${lastLeg.arr}</div>
+                                <div class="route-code">${lastLeg.to}</div>
                             </div>
                         </div>
 
                         <div class="duration-cell">
-                            <div class="duration-time">${f.duration}</div>
-                            <div class="duration-badge">Non-Stop</div>
+                            <div class="duration-time">${route.duration_fmt}</div>
+                            <div class="duration-badge">${stops}</div>
+                            ${routeDesc}
                         </div>
 
                         <div class="price-cell">
-                            <div class="price-amount">₹${f.price}</div>
+                            <div class="price-amount">₹${route.total_price}</div>
                             <div class="price-label">per person</div>
                         </div>
 
                         <div class="action-cell">
-                            <button class="book-button" onclick="alert('Ticket booked for Flight ${f.id}!')">Book Now</button>
+                            <button class="book-button" onclick="alert('Booking confirmed for ₹${route.total_price}')">Book</button>
                         </div>
-                    </div>
-                    `;
+                    </div>`;
+                    
                     container.innerHTML += row;
                 });
 
             } catch (error) {
                 loader.style.display = "none";
-                container.innerHTML = `<div style="padding:20px; text-align:center; color:red;">Error fetching flights.</div>`;
+                container.innerHTML = `<div style="padding:20px; text-align:center; color:red;">Error loading flights.</div>`;
                 console.error(error);
             }
         }
 
-        // ==========================================
-        // 4. MAP LOGIC
-        // ==========================================
-        function updateMap(fromCode, toCode) {
-            const fromAirport = allAirports.find(a => a.code === fromCode);
-            const toAirport = allAirports.find(a => a.code === toCode);
+        // 3. Draw Complex Routes (Multi-Leg)
+        function drawRouteOnMap(segments) {
+            // Clear previous
+            mapLayers.forEach(l => map.removeLayer(l));
+            mapLayers = [];
 
-            if (!fromAirport || !toAirport) return;
+            const pathCoords = [];
 
-            // Remove existing layers
-            if (fromMarker) map.removeLayer(fromMarker);
-            if (toMarker) map.removeLayer(toMarker);
-            if (routeLine) map.removeLayer(routeLine);
+            // Collect all points in the path
+            segments.forEach(seg => {
+                const fromApt = allAirports.find(a => a.code === seg.from);
+                const toApt = allAirports.find(a => a.code === seg.to);
+                
+                if(fromApt && toApt) {
+                    // Safe access for long/lng
+                    const fLat = fromApt.lat, fLng = fromApt.long || fromApt.lng;
+                    const tLat = toApt.lat, tLng = toApt.long || toApt.lng;
 
-            // Note: Backend JSON uses "long" for longitude, Leaflet expects [lat, lng]
-            // We check for both 'long' and 'lng' to be safe with C++ models
-            const fromLon = fromAirport.long || fromAirport.lng;
-            const toLon = toAirport.long || toAirport.lng;
+                    pathCoords.push([fLat, fLng]);
+                    pathCoords.push([tLat, tLng]);
 
-            const fromLatLng = [fromAirport.lat, fromLon];
-            const toLatLng = [toAirport.lat, toLon];
+                    // Add Markers
+                    const m1 = L.marker([fLat, fLng], {icon: airportIcon}).addTo(map).bindPopup(seg.from);
+                    const m2 = L.marker([tLat, tLng], {icon: airportIcon}).addTo(map).bindPopup(seg.to);
+                    mapLayers.push(m1, m2);
+                }
+            });
 
-            // Add Markers
-            fromMarker = L.marker(fromLatLng, { icon: airportIcon }).addTo(map)
-                .bindPopup(`<b>${fromAirport.name}</b><br>${fromAirport.code}`);
-
-            toMarker = L.marker(toLatLng, { icon: airportIcon }).addTo(map)
-                .bindPopup(`<b>${toAirport.name}</b><br>${toAirport.code}`);
-
-            // Draw Route
-            routeLine = L.polyline([fromLatLng, toLatLng], {
-                color: '#3b82f6', weight: 3, opacity: 0.7, dashArray: '10, 10', lineJoin: 'round'
+            // Draw Polyline (Connecting all points)
+            const line = L.polyline(pathCoords, {
+                color: '#3b82f6', weight: 4, opacity: 0.8, lineJoin: 'round', dashArray: '10, 10'
             }).addTo(map);
+            
+            mapLayers.push(line);
 
-            // Fit Bounds
-            map.fitBounds(L.latLngBounds(fromLatLng, toLatLng), { padding: [50, 50] });
-
-            // Animate Line
+            // Animate
             let offset = 0;
-            setInterval(() => {
-                offset += 2;
-                if(routeLine) routeLine.setStyle({ dashOffset: offset.toString() });
+            const anim = setInterval(() => {
+                offset += 1;
+                line.setStyle({ dashOffset: offset.toString() });
             }, 100);
+            
+            // Zoom to fit
+            if(pathCoords.length > 0) map.fitBounds(L.latLngBounds(pathCoords), {padding: [50,50]});
         }
 
-        // Load airports on startup
         loadAirports();
-
     </script>
 </body>
 </html>
