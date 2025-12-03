@@ -1,48 +1,61 @@
-#include "jsondb.h"
+#include "JsonDB.h"
 #include <fstream>
 #include <iostream>
-#include <cstdlib> // For random numbers
+#include <queue>
+#include <set>
+#include <cstdlib> 
+#include <ctime>   
+#include <mutex> // <--- Added explicit include to fix 'mutex not declared'
 
-// Constructor
-JsonDB::JsonDB(const std::string& fname) : filename(fname) {
-    std::ifstream file(filename);
+using namespace std;
+
+// ==========================================
+// CONSTRUCTOR & HELPERS
+// ==========================================
+
+JsonDB::JsonDB(const string& fname) : filename(fname) {
+    ifstream file(filename);
     if (file.is_open()) {
         try { file >> data; } catch (...) { data = json::object(); }
     }
+    
     // If file is empty or missing data, generate it
     if (data.empty() || !data.contains("airports")) {
         seed_data();
     }
+    
+    // Always build the graph for the algorithm on startup
+    build_graph();
 }
 
 void JsonDB::save() {
-    std::ofstream file(filename);
+    ofstream file(filename);
     file << data.dump(4);
+    // Rebuild graph whenever data changes
+    build_graph();
 }
-// Helper: "02h 15m" -> 135 minutes
-int JsonDB::parse_duration_string(const std::string& dur) {
+
+int JsonDB::parse_duration_string(const string& dur) {
     try {
-        // Expected format "Xh Ym"
         size_t h_pos = dur.find('h');
         size_t m_pos = dur.find('m');
-        if (h_pos == std::string::npos) return 0;
+        if (h_pos == string::npos) return 0;
         
-        int hours = std::stoi(dur.substr(0, h_pos));
+        int hours = stoi(dur.substr(0, h_pos));
         int mins = 0;
         
-        // Find space between h and number
         size_t space_pos = dur.find(' ');
-        if (space_pos != std::string::npos && m_pos != std::string::npos) {
-            mins = std::stoi(dur.substr(space_pos + 1, m_pos - space_pos - 1));
+        if (space_pos != string::npos && m_pos != string::npos) {
+            mins = stoi(dur.substr(space_pos + 1, m_pos - space_pos - 1));
         }
         return (hours * 60) + mins;
     } catch (...) {
-        return 60; // Default safe fallback
+        return 60; 
     }
 }
 
-// Build Adjacency List from JSON
 void JsonDB::build_graph() {
+    // Note: We don't lock here because this is an internal helper called by locked functions
     adj_list.clear();
     
     if (!data.contains("flights")) return;
@@ -58,78 +71,69 @@ void JsonDB::build_graph() {
         e.airline = f["airline"];
         e.weight_minutes = parse_duration_string(f["duration"]);
 
-        // Add to Source bucket
         adj_list[f["from_code"]].push_back(e);
     }
 }
 
 // ==========================================
-// THE K-SHORTEST PATH ALGORITHM (Date Aware)
+// THE K-SHORTEST PATH ALGORITHM
 // ==========================================
+
 struct PathState {
     int total_minutes;
-    std::string current_node;
-    std::vector<Edge> history; // Stores the actual flights taken
+    string current_node;
+    vector<Edge> history;
 
-    // Priority Queue Comparator (Min-Heap based on time)
     bool operator>(const PathState& other) const {
         return total_minutes > other.total_minutes;
     }
 };
 
-json JsonDB::find_smart_routes(const std::string& src, const std::string& dst, const std::string& req_date, int k) {
-    std::lock_guard<std::mutex> lock(db_mutex);
+json JsonDB::find_smart_routes(const string& src, const string& dst, const string& req_date, int k) {
+    lock_guard<mutex> lock(db_mutex); // Now this will work because headers are correct
     
     json results = json::array();
     
-    // Priority Queue: {Cost, CurrentNode, PathHistory}
-    std::priority_queue<PathState, std::vector<PathState>, std::greater<PathState>> pq;
-    
-    // Start at Source, 0 cost, empty history
+    priority_queue<PathState, vector<PathState>, greater<PathState>> pq;
     pq.push({0, src, {}});
 
-    // To prevent infinite loops in cyclic graphs
-    // We count how many times we've finalized a path to a specific node
-    std::unordered_map<std::string, int> visits;
+    unordered_map<string, int> visits;
 
     while (!pq.empty() && results.size() < k) {
         PathState top = pq.top();
         pq.pop();
 
-        std::string u = top.current_node;
+        string u = top.current_node;
 
-        // TARGET REACHED?
         if (u == dst) {
-            // Convert history to JSON format
             json route;
             route["total_time"] = top.total_minutes;
-            route["stops"] = (int)top.history.size() - 1; // 1 flight = 0 stops
+            
+            int h = top.total_minutes / 60;
+            int m = top.total_minutes % 60;
+            route["duration_fmt"] = to_string(h) + "h " + to_string(m) + "m";
+            
+            route["stops"] = (int)top.history.size() - 1;
             
             json segments = json::array();
+            string current_from = src; 
+
             for(const auto& h : top.history) {
                 segments.push_back({
                     {"airline", h.airline},
                     {"flight_id", h.flight_id},
-                    {"from", (segments.empty() ? src : segments.back()["to"])}, // Logic inference
+                    {"from", current_from}, 
                     {"to", h.destination},
                     {"dep", h.dep_time},
                     {"arr", h.arr_time},
-                    {"price", h.price}
+                    {"price", h.price},
+                    {"date", h.date}
                 });
-                // Fix "from" logic: The history stores edges. 
-                // The "from" of current edge is the "to" of previous edge.
+                current_from = h.destination;
             }
             
-            // Fix the "From" codes in segments
-            std::string prev_code = src;
-            for(auto& seg : segments) {
-                seg["from"] = prev_code;
-                prev_code = seg["to"];
-            }
-
             route["segments"] = segments;
             
-            // Calculate total price
             int total_price = 0;
             for(const auto& s : segments) total_price += (int)s["price"];
             route["total_price"] = total_price;
@@ -138,43 +142,28 @@ json JsonDB::find_smart_routes(const std::string& src, const std::string& dst, c
             continue; 
         }
 
-        // Optimization: Don't visit any node more than K times
         if (visits[u] >= k) continue;
         visits[u]++;
 
-        // EXPLORE FLIGHTS
         if (adj_list.find(u) != adj_list.end()) {
             for (const auto& edge : adj_list[u]) {
                 
-                // --- FILTER 1: DATE CHECK ---
                 if (edge.date != req_date) continue;
 
-                // --- FILTER 2: CYCLE CHECK ---
-                // Don't go back to a city we already visited in this path
                 bool cycle = false;
-                if (u == src) { /* safe */ } 
-                else {
-                    // Check history (heuristic: check previous edge's source)
-                    for(const auto& prev : top.history) {
-                         // Simple check: don't fly back to source
-                         if (edge.destination == src) cycle = true;
-                    }
+                for(const auto& prev : top.history) {
+                     if (edge.destination == src || prev.destination == edge.destination) cycle = true;
                 }
                 if (cycle) continue;
 
-                // --- FILTER 3: CONNECTION TIME (Optional but good) ---
-                // If this is a connection, ensure Dep Time > Previous Arr Time
                 if (!top.history.empty()) {
-                    std::string prev_arr = top.history.back().arr_time;
-                    // String compare works for HH:MM (e.g. "14:00" > "12:00")
+                    string prev_arr = top.history.back().arr_time;
                     if (edge.dep_time < prev_arr) continue; 
                 }
 
-                // Add to Queue
-                std::vector<Edge> new_history = top.history;
+                vector<Edge> new_history = top.history;
                 new_history.push_back(edge);
                 
-                // Add connection penalty (e.g., 60 mins layover assumption) if not direct
                 int layover = top.history.empty() ? 0 : 60; 
 
                 pq.push({
@@ -190,13 +179,12 @@ json JsonDB::find_smart_routes(const std::string& src, const std::string& dst, c
 }
 
 // ==========================================
-// SEEDING LOGIC (The Heavy Lifter)
+// SEEDING LOGIC
 // ==========================================
 void JsonDB::seed_data() {
-    std::cout << "[INFO] Seeding database with 50 Airports and Flights..." << std::endl;
+    cout << "[INFO] Seeding database with 50 Airports and Flights..." << endl;
 
-    // 1. The 50 Indian Airports
-    std::vector<Airport> airports = {
+    vector<Airport> airports = {
         {1, "DEL", "Indira Gandhi Intl", "New Delhi", 28.5562, 77.1000},
         {2, "BOM", "Chhatrapati Shivaji Maharaj Intl", "Mumbai", 19.0896, 72.8656},
         {3, "BLR", "Kempegowda Intl", "Bengaluru", 13.1986, 77.7066},
@@ -250,151 +238,61 @@ void JsonDB::seed_data() {
     };
     data["airports"] = airports;
 
-    // 2. Generate 250+ Flights
-    std::vector<Flight> flights;
+    vector<Flight> flights;
     int flight_counter = 1000;
-    std::string airlines[] = {"IndiGo", "Air India", "Vistara", "SpiceJet", "Akasa Air"};
+    string airlines[] = {"IndiGo", "Air India", "Vistara", "SpiceJet", "Akasa Air"};
+    srand(time(0));
 
     for (size_t i = 0; i < airports.size(); ++i) {
-        std::string src = airports[i].code;
+        string src = airports[i].code;
+        for (int k = 0; k < 5; ++k) {
+            int dest_idx = (i + k + 1) % airports.size();
+            string dst = airports[dest_idx].code;
 
-        // Create 5 flights per airport
-        for (int j = 1; j <= 5; ++j) {
-            int dest_index = (i + j) % airports.size();
-            std::string dst = airports[dest_index].code;
+            for (int day = 1; day <= 10; ++day) {
+                string date = "2025-12-" + (day < 10 ? "0" + to_string(day) : to_string(day));
+                
+                int dep_h = 6 + (rand() % 14);
+                int dep_m = (rand() % 4) * 15;
+                int dur_h = 1 + (rand() % 3);
+                int arr_h = (dep_h + dur_h) % 24;
 
-            // Randomize Data
-            int airline_idx = rand() % 5;
-            int dep_hour = 6 + (rand() % 16); // 06:00 to 22:00
-            int dep_min = (rand() % 4) * 15;  // 00, 15, 30, 45
-            int dur_hour = 1 + (rand() % 3);  // 1 to 3 hours
-            int arr_hour = (dep_hour + dur_hour) % 24;
+                char time_buf[10];
+                sprintf(time_buf, "%02d:%02d", dep_h, dep_m);
+                string dep = time_buf;
+                sprintf(time_buf, "%02d:%02d", arr_h, dep_m);
+                string arr = time_buf;
 
-            // Format Time Strings
-            char time_buf[10];
-            sprintf(time_buf, "%02d:%02d", dep_hour, dep_min);
-            std::string departure = time_buf;
-            
-            sprintf(time_buf, "%02d:%02d", arr_hour, dep_min);
-            std::string arrival = time_buf;
+                Flight f;
+                f.id = "FL" + to_string(flight_counter++);
+                f.airline = airlines[rand() % 5];
+                f.from_code = src;
+                f.to_code = dst;
+                f.date = date;
+                f.departure = dep;
+                f.arrival = arr;
+                f.duration = to_string(dur_h) + "h 00m";
+                f.price = 3000 + (rand() % 5000);
 
-            std::string duration = std::to_string(dur_hour) + "h 00m";
-            int price = 3000 + (rand() % 5000); // 3000 to 8000
-
-            Flight f;
-            f.id = "FL" + std::to_string(flight_counter++);
-            f.airline = airlines[airline_idx];
-            f.from_code = src;
-            f.to_code = dst;
-            f.date = "2025-12-" + std::to_string(10 + j);
-            f.departure = departure;
-            f.arrival = arrival;
-            f.duration = duration;
-            f.price = price;
-
-            flights.push_back(f);
+                flights.push_back(f);
+            }
         }
     }
     data["flights"] = flights;
-    save();
+    save(); 
 }
 
-// --- READ OPERATIONS ---
+// ==========================================
+// API GETTERS & ADMIN OPS
+// ==========================================
+
 json JsonDB::get_all_airports() {
-    std::lock_guard<std::mutex> lock(db_mutex);
+    lock_guard<mutex> lock(db_mutex);
     return data.value("airports", json::array());
 }
 
 json JsonDB::get_flights_limited(int limit) {
-    std::lock_guard<std::mutex> lock(db_mutex);
-    json result = json::array();
-    if (!data.contains("flights")) return result;
-    
-    int count = 0;
-    for (const auto& f : data["flights"]) {
-        if (count++ >= limit) break;
-        result.push_back(f);
-    }
-    return result;
-}
-
-json JsonDB::search_flights(const std::string& src, const std::string& dst) {
-    std::lock_guard<std::mutex> lock(db_mutex);
-    json result = json::array();
-    if (!data.contains("flights")) return result;
-
-    for (const auto& f : data["flights"]) {
-        if (f.value("from_code", "") == src && f.value("to_code", "") == dst) {
-            result.push_back(f);
-        }
-    }
-    return result;
-}
-
-json JsonDB::search_flights_by_date(const std::string& date) {
-    std::lock_guard<std::mutex> lock(db_mutex);
-    json result = json::array();
-    if (!data.contains("flights")) return result;
-
-    for (const auto& f : data["flights"]) {
-        if (f.value("date", "") == date) result.push_back(f);
-    }
-    return result;
-}
-
-// --- ADMIN OPERATIONS (Airports) ---
-bool JsonDB::add_airport(const Airport& apt) {
-    std::lock_guard<std::mutex> lock(db_mutex);
-    if (!data.contains("airports")) data["airports"] = json::array();
-    
-    for (const auto& existing : data["airports"]) {
-        if (existing.value("code", "") == apt.code) return false; // Duplicate
-    }
-    
-    // Explicitly convert struct to json before pushing
-    json j_apt = apt; 
-    data["airports"].push_back(j_apt);
-    save();
-    return true;
-}
-
-bool JsonDB::delete_airport(const std::string& code) {
-    std::lock_guard<std::mutex> lock(db_mutex);
-    if (!data.contains("airports")) return false;
-    
-    auto& arr = data["airports"];
-    for (auto it = arr.begin(); it != arr.end(); ++it) {
-        if ((*it).value("code", "") == code) {
-            arr.erase(it);
-            save();
-            return true;
-        }
-    }
-    return false;
-}
-
-bool JsonDB::update_airport(const std::string& code, const json& new_data) {
-    std::lock_guard<std::mutex> lock(db_mutex);
-    if (!data.contains("airports")) return false;
-
-    for (auto& apt : data["airports"]) {
-        if (apt.value("code", "") == code) {
-            for (auto& el : new_data.items()) apt[el.key()] = el.value();
-            save();
-            return true;
-        }
-    }
-    return false;
-}
-
-// --- STANDARD GETTERS ---
-json JsonDB::get_all_airports() {
-    std::lock_guard<std::mutex> lock(db_mutex);
-    return data.value("airports", json::array());
-}
-json JsonDB::get_flights_limited(int limit) {
-    std::lock_guard<std::mutex> lock(db_mutex);
-    // Simple implementation
+    lock_guard<mutex> lock(db_mutex);
     json res = json::array();
     if(data.contains("flights")) {
         int c=0;
@@ -405,45 +303,62 @@ json JsonDB::get_flights_limited(int limit) {
     }
     return res;
 }
-// --- ADMIN OPERATIONS (Flights) ---
-bool JsonDB::add_flight(const Flight& fl) {
-    std::lock_guard<std::mutex> lock(db_mutex);
-    if (!data.contains("flights")) data["flights"] = json::array();
 
-    for (const auto& existing : data["flights"]) {
-        if (existing.value("id", "") == fl.id) return false;
-    }
-
-    json j_fl = fl;
-    data["flights"].push_back(j_fl);
-    save();
-    return true;
+bool JsonDB::add_airport(const Airport& apt) {
+    lock_guard<mutex> lock(db_mutex);
+    if (!data.contains("airports")) data["airports"] = json::array();
+    for(auto& x : data["airports"]) if(x["code"] == apt.code) return false;
+    json j = apt; data["airports"].push_back(j); save(); return true;
 }
 
-bool JsonDB::delete_flight(const std::string& id) {
-    std::lock_guard<std::mutex> lock(db_mutex);
-    if (!data.contains("flights")) return false;
+bool JsonDB::delete_airport(const string& code) {
+    lock_guard<mutex> lock(db_mutex);
+    if(!data.contains("airports")) return false;
+    auto& arr = data["airports"];
+    for(auto it = arr.begin(); it != arr.end(); ++it) {
+        if((*it)["code"] == code) { arr.erase(it); save(); return true; }
+    }
+    return false;
+}
 
-    auto& arr = data["flights"];
-    for (auto it = arr.begin(); it != arr.end(); ++it) {
-        if ((*it).value("id", "") == id) {
-            arr.erase(it);
-            save();
-            return true;
+bool JsonDB::update_airport(const string& code, const json& new_data) {
+    lock_guard<mutex> lock(db_mutex);
+    if (!data.contains("airports")) return false;
+    for (auto& apt : data["airports"]) {
+        if (apt["code"] == code) {
+            for (auto& el : new_data.items()) apt[el.key()] = el.value();
+            save(); return true;
         }
     }
     return false;
 }
 
-bool JsonDB::update_flight(const std::string& id, const json& new_data) {
-    std::lock_guard<std::mutex> lock(db_mutex);
-    if (!data.contains("flights")) return false;
+bool JsonDB::add_flight(const Flight& fl) {
+    lock_guard<mutex> lock(db_mutex);
+    if (!data.contains("flights")) data["flights"] = json::array();
+    for (const auto& existing : data["flights"]) {
+        if (existing.value("id", "") == fl.id) return false;
+    }
+    json j = fl; data["flights"].push_back(j); save(); return true;
+}
 
+bool JsonDB::delete_flight(const string& id) {
+    lock_guard<mutex> lock(db_mutex);
+    if(!data.contains("flights")) return false;
+    auto& arr = data["flights"];
+    for(auto it = arr.begin(); it != arr.end(); ++it) {
+        if((*it)["id"] == id) { arr.erase(it); save(); return true; }
+    }
+    return false;
+}
+
+bool JsonDB::update_flight(const string& id, const json& new_data) {
+    lock_guard<mutex> lock(db_mutex);
+    if (!data.contains("flights")) return false;
     for (auto& fl : data["flights"]) {
-        if (fl.value("id", "") == id) {
+        if (fl["id"] == id) {
             for (auto& el : new_data.items()) fl[el.key()] = el.value();
-            save();
-            return true;
+            save(); return true;
         }
     }
     return false;

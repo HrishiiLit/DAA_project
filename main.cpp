@@ -1,10 +1,6 @@
-#include <crow.h>
-#include <nlohmann/json.hpp>
+#include "crow.h"
 #include "jsondb.h"
-#include "Models.h"
 #include <iostream>
-
-using json = nlohmann::json;
 
 
 // --- Struct for K-Shortest Path ---
@@ -104,35 +100,14 @@ int main() {
     crow::App<CORSHandler> app;
 
     // ==========================================
-    // CORS is handled via CORSHandler middleware - no need for explicit OPTIONS routes
+    // GLOBAL OPTIONS ROUTE (Handle Preflight Requests)
+    // Browsers send an "OPTIONS" request first to check security.
+    // We must catch this and return 200 OK.
     // ==========================================
-
-    // ==========================================
-    // ROOT ENDPOINT
-    // ==========================================
-    CROW_ROUTE(app, "/")
-    ([](){
-        json response = {
-            {"status", "ok"},
-            {"message", "Flight Booking API Server"},
-            {"version", "1.0.0"},
-            {"endpoints", {
-                {"GET /api/airports", "Get all airports"},
-                {"GET /api/flights", "Get flights (limit: 10 by default)"},
-                {"GET /api/search?from=X&to=Y", "Search flights"},
-                {"GET /api/search_date?date=YYYY-MM-DD", "Search flights by date"},
-                {"/health", "Health check endpoint"}
-            }}
-        };
-        return crow::response(response.dump());
-    });
-
-    // ==========================================
-    // HEALTH CHECK ENDPOINT
-    // ==========================================
-    CROW_ROUTE(app, "/health")
-    ([](){
-        return crow::response(200, "OK");
+    CROW_ROUTE(app, "/<path>")
+    .methods(crow::HTTPMethod::OPTIONS)
+    ([](const crow::request& req){
+        return crow::response(200);
     });
 
     // ==========================================
@@ -270,16 +245,13 @@ int main() {
         }
     });
 
-    int port = 8080;  // Default to 8080 for cloud deployments
-    if (const char* env_p = std::getenv("PORT")) {
-        try {
-            port = std::stoi(env_p);
-        } catch (...) {
-            std::cerr << "Invalid PORT value, using default 8080" << std::endl;
-        }
-    }
+    std::cout << "Server running on port " << std::getenv("PORT") ? std::getenv("PORT") : "18080" << std::endl;
     
-    std::cout << "Server starting on 0.0.0.0:" << port << std::endl;
+    // Railway requires listening on 0.0.0.0 and the $PORT env variable
+    int port = 18080;
+    if (const char* env_p = std::getenv("PORT")) {
+        port = std::stoi(env_p);
+    }
     
     app.port(port).multithreaded().run();
 }
